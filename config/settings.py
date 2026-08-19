@@ -13,6 +13,7 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
     "unsafe-development-key",
@@ -30,13 +31,14 @@ DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 #   127.0.0.1
 #
 # RAILWAY:
-#   Railway provides RAILWAY_PUBLIC_DOMAIN automatically when the
-#   service has a public domain.
+#   Railway provides RAILWAY_PUBLIC_DOMAIN automatically when the service
+#   has a public domain.
 #
-# You can also manually add hosts through ALLOWED_HOSTS in Railway.
+# CUSTOM:
+#   Additional domains can be supplied through ALLOWED_HOSTS.
 #
 # Example:
-# ALLOWED_HOSTS=your-domain.com,api.your-domain.com
+#   ALLOWED_HOSTS=api.example.com,example.com
 #
 # =============================================================================
 
@@ -45,11 +47,16 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
 ]
 
+
 # Railway public domain
 railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
 
 if railway_domain:
-    ALLOWED_HOSTS.append(railway_domain)
+    railway_domain = railway_domain.strip()
+
+    if railway_domain:
+        ALLOWED_HOSTS.append(railway_domain)
+
 
 # Additional hosts supplied through environment variables
 extra_allowed_hosts = os.getenv("ALLOWED_HOSTS", "")
@@ -62,8 +69,8 @@ if extra_allowed_hosts:
     )
 
 
-# Remove duplicates
-ALLOWED_HOSTS = list(set(ALLOWED_HOSTS))
+# Remove duplicates while preserving order
+ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
 
 
 # =============================================================================
@@ -105,6 +112,7 @@ MIDDLEWARE = [
     # Serve static files in production
     "whitenoise.middleware.WhiteNoiseMiddleware",
 
+    # CORS
     "corsheaders.middleware.CorsMiddleware",
 
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -132,6 +140,7 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
         },
@@ -232,6 +241,7 @@ STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
+
     "staticfiles": {
         "BACKEND": (
             "whitenoise.storage."
@@ -244,12 +254,34 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 
-
 # =============================================================================
 # EMAIL
 # =============================================================================
+#
+# Current setup:
+#   Console email backend for development.
+#
+# Later production email:
+#   Set EMAIL_BACKEND and SMTP environment variables.
+#
+# =============================================================================
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = (
+    os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
+)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    "NWASHC Request Tracking System <noreply@example.com>",
+)
 
 
 # =============================================================================
@@ -268,17 +300,29 @@ REST_FRAMEWORK = {
 
 
 # =============================================================================
+# FRONTEND URL
+# =============================================================================
+#
+# Local:
+#   http://localhost:5173
+#
+# Production:
+#   Set FRONTEND_URL in Railway.
+#
+# Example:
+#   FRONTEND_URL=https://your-frontend.vercel.app
+#
+# =============================================================================
+
+frontend_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+
+
+# =============================================================================
 # CORS
 # =============================================================================
 #
-# LOCAL:
-#   http://localhost:5173
-#
-# PRODUCTION:
-#   Set FRONTEND_URL in Railway after deploying the React frontend.
-#
-# Example:
-# FRONTEND_URL=https://your-frontend.vercel.app
+# CORS controls which frontend applications are allowed to make API
+# requests to this backend.
 #
 # =============================================================================
 
@@ -286,11 +330,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ]
 
-frontend_url = os.getenv("FRONTEND_URL")
-
 if frontend_url:
-    frontend_url = frontend_url.rstrip("/")
-
     if frontend_url not in CORS_ALLOWED_ORIGINS:
         CORS_ALLOWED_ORIGINS.append(frontend_url)
 
@@ -298,11 +338,65 @@ if frontend_url:
 # =============================================================================
 # CSRF
 # =============================================================================
+#
+# CSRF controls which trusted origins can submit requests to Django.
+#
+# IMPORTANT:
+#   The Railway backend domain must be included because Django Admin
+#   submits forms directly to the Railway backend.
+#
+# =============================================================================
 
-CSRF_TRUSTED_ORIGINS = []
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:8000",
+]
 
+# React frontend
 if frontend_url:
-    CSRF_TRUSTED_ORIGINS.append(frontend_url)
+    if frontend_url not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(frontend_url)
+
+
+# Railway backend
+if railway_domain:
+    railway_origin = f"https://{railway_domain}"
+
+    if railway_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(railway_origin)
+
+
+# =============================================================================
+# PROXY / HTTPS
+# =============================================================================
+#
+# Railway terminates HTTPS at its proxy and forwards the request to Django.
+#
+# This tells Django that the original request was HTTPS.
+#
+# =============================================================================
+
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)
+
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+if not DEBUG:
+
+    SESSION_COOKIE_SECURE = True
+
+    CSRF_COOKIE_SECURE = True
+
+    SECURE_BROWSER_XSS_FILTER = True
+
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+
+    X_FRAME_OPTIONS = "DENY"
 
 
 # =============================================================================
