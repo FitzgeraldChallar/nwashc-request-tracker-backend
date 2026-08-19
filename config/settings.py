@@ -31,23 +31,12 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
 ]
 
-# Railway automatically provides this when the service has a public domain.
 railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
 
 if railway_domain:
-    ALLOWED_HOSTS.append(
-        railway_domain.strip()
-    )
+    ALLOWED_HOSTS.append(railway_domain)
 
-# Additional hosts can be supplied through Railway.
-#
-# Example:
-# ALLOWED_HOSTS=example.com,www.example.com
-#
-extra_allowed_hosts = os.getenv(
-    "ALLOWED_HOSTS",
-    "",
-)
+extra_allowed_hosts = os.getenv("ALLOWED_HOSTS", "")
 
 if extra_allowed_hosts:
     ALLOWED_HOSTS.extend(
@@ -56,10 +45,7 @@ if extra_allowed_hosts:
         if host.strip()
     )
 
-# Remove duplicates while preserving order.
-ALLOWED_HOSTS = list(
-    dict.fromkeys(ALLOWED_HOSTS)
-)
+ALLOWED_HOSTS = list(set(ALLOWED_HOSTS))
 
 
 # =============================================================================
@@ -323,9 +309,16 @@ if frontend_url:
 
 CSRF_TRUSTED_ORIGINS = []
 
+# Railway backend domain
+if railway_domain:
+    CSRF_TRUSTED_ORIGINS.append(
+        f"https://{railway_domain}"
+    )
+
+# Frontend domain
 if frontend_url:
     CSRF_TRUSTED_ORIGINS.append(
-        frontend_url
+        frontend_url.rstrip("/")
     )
 
 
