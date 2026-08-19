@@ -13,7 +13,6 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
     "unsafe-development-key",
@@ -25,25 +24,35 @@ DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 # =============================================================================
 # ALLOWED HOSTS
 # =============================================================================
+#
+# LOCAL:
+#   localhost
+#   127.0.0.1
+#
+# RAILWAY:
+#   Railway provides RAILWAY_PUBLIC_DOMAIN automatically when the
+#   service has a public domain.
+#
+# You can also manually add hosts through ALLOWED_HOSTS in Railway.
+#
+# Example:
+# ALLOWED_HOSTS=your-domain.com,api.your-domain.com
+#
+# =============================================================================
 
 ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.getenv(
-        "ALLOWED_HOSTS",
-        "localhost,127.0.0.1",
-    ).split(",")
-    if host.strip()
+    "localhost",
+    "127.0.0.1",
 ]
 
+# Railway public domain
 railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
 
 if railway_domain:
     ALLOWED_HOSTS.append(railway_domain)
 
-extra_allowed_hosts = os.getenv(
-    "ALLOWED_HOSTS",
-    "",
-)
+# Additional hosts supplied through environment variables
+extra_allowed_hosts = os.getenv("ALLOWED_HOSTS", "")
 
 if extra_allowed_hosts:
     ALLOWED_HOSTS.extend(
@@ -51,6 +60,10 @@ if extra_allowed_hosts:
         for host in extra_allowed_hosts.split(",")
         if host.strip()
     )
+
+
+# Remove duplicates
+ALLOWED_HOSTS = list(set(ALLOWED_HOSTS))
 
 
 # =============================================================================
@@ -89,7 +102,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
 
-    # WhiteNoise serves Django static files in production
+    # Serve static files in production
     "whitenoise.middleware.WhiteNoiseMiddleware",
 
     "corsheaders.middleware.CorsMiddleware",
@@ -136,12 +149,13 @@ WSGI_APPLICATION = "config.wsgi.application"
 # LOCAL:
 #   No DATABASE_URL → SQLite
 #
-# PRODUCTION:
+# RAILWAY:
 #   DATABASE_URL exists → PostgreSQL
 #
 # =============================================================================
 
 if os.getenv("DATABASE_URL"):
+
     import dj_database_url
 
     DATABASES = {
@@ -153,12 +167,14 @@ if os.getenv("DATABASE_URL"):
     }
 
 else:
+
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+
 
 # =============================================================================
 # PASSWORD VALIDATION
@@ -212,15 +228,11 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-STATICFILES_STORAGE = (
-    "whitenoise.storage.CompressedManifestStaticFilesStorage"
-)
-
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 
-# WhiteNoise compression
+# WhiteNoise
 STATICFILES_STORAGE = (
     "whitenoise.storage.CompressedManifestStaticFilesStorage"
 )
@@ -241,6 +253,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
@@ -250,22 +263,29 @@ REST_FRAMEWORK = {
 # =============================================================================
 # CORS
 # =============================================================================
+#
+# LOCAL:
+#   http://localhost:5173
+#
+# PRODUCTION:
+#   Set FRONTEND_URL in Railway after deploying the React frontend.
+#
+# Example:
+# FRONTEND_URL=https://your-frontend.vercel.app
+#
+# =============================================================================
 
 CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173",
-    ).split(",")
-    if origin.strip()
+    "http://localhost:5173",
 ]
 
 frontend_url = os.getenv("FRONTEND_URL")
 
 if frontend_url:
-    CORS_ALLOWED_ORIGINS.append(
-        frontend_url.rstrip("/")
-    )
+    frontend_url = frontend_url.rstrip("/")
+
+    if frontend_url not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(frontend_url)
 
 
 # =============================================================================
@@ -274,12 +294,8 @@ if frontend_url:
 
 CSRF_TRUSTED_ORIGINS = []
 
-frontend_url = os.getenv("FRONTEND_URL")
-
 if frontend_url:
-    CSRF_TRUSTED_ORIGINS.append(
-        frontend_url.rstrip("/")
-    )
+    CSRF_TRUSTED_ORIGINS.append(frontend_url)
 
 
 # =============================================================================
