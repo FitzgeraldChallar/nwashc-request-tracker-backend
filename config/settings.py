@@ -27,8 +27,12 @@ DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 # =============================================================================
 
 ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
+    host.strip()
+    for host in os.getenv(
+        "ALLOWED_HOSTS",
+        "localhost,127.0.0.1",
+    ).split(",")
+    if host.strip()
 ]
 
 railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN")
@@ -156,7 +160,6 @@ else:
         }
     }
 
-
 # =============================================================================
 # PASSWORD VALIDATION
 # =============================================================================
@@ -209,6 +212,10 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+STATICFILES_STORAGE = (
+    "whitenoise.storage.CompressedManifestStaticFilesStorage"
+)
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -245,7 +252,12 @@ REST_FRAMEWORK = {
 # =============================================================================
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173",
+    ).split(",")
+    if origin.strip()
 ]
 
 frontend_url = os.getenv("FRONTEND_URL")
